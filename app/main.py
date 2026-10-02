@@ -87,20 +87,38 @@ class ExportReq(BaseModel):
 @app.post("/api/export", response_class=PlainTextResponse)
 def export(req: ExportReq):
     """manifest.jsonl for a labeling / training pipeline."""
-    lines = []
-    for s in req.sources:
-        r = miner.row(s) or {"source": s}
-        c = miner.card(r) if miner.row(s) else {}
-        a = miner.analysis.get(s, {})
-        lines.append(json.dumps({
-            "source": s, "original_video": r.get("original_video"), "camera_id": r.get("camera_id"),
-            "start_sec": r.get("start_sec"), "end_sec": r.get("end_sec"), "title": c.get("title"),
-            "categories": r.get("categories"), "condition": r.get("condition"),
-            "criticality": c.get("criticality"), "rarity": c.get("rarity"),
-            "scenario": {k: a[k] for k in ("actors", "maneuver", "closest_gap", "occlusion", "lighting", "near_miss")
-                         if k in a} or None,
-        }))
-    return "\n".join(lines)
+    return "\n".join(json.dumps(r) for r in miner.export_rows(req.sources))
+
+
+@app.post("/api/export/wandb")
+def export_wandb(req: ExportReq):
+    try:
+        return miner.export_wandb(req.sources)
+    except RuntimeError as e:
+        raise HTTPException(400, str(e))
+
+
+class MineReq(BaseModel):
+    prompt: str
+    domain: str = "all"
+
+
+@app.post("/api/mine")
+def mine(req: MineReq):
+    """Agent: prompt -> search phrases -> search -> Cosmos verifies -> clips + manifest."""
+    need_ready()
+    return miner.mine(req.prompt, domain=req.domain)
+
+
+class GapReq(BaseModel):
+    category: str
+    condition: str
+
+
+@app.post("/api/fill-gap")
+def fill_gap(req: GapReq):
+    need_ready()
+    return miner.fill_gap(req.category, req.condition)
 
 
 @app.get("/api/clip")

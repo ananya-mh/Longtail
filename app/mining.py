@@ -131,6 +131,11 @@ def gap_from_detections(det):
     return None if best is None else round(best, 3)
 
 
+def clip_id(source):
+    """Stable, readable id from the segment key, e.g. 20261001_sf4_chunk_0009_segment_001_of_006."""
+    return (source or "").rsplit("/", 1)[-1].removesuffix(".mp4")
+
+
 class Miner:
     def __init__(self, vss=None):
         self.vss = vss or VSSClient()
@@ -153,7 +158,7 @@ class Miner:
                 self.rows, self.vecs = rows, vecs
                 self.index = {r["source"]: i for i, r in enumerate(rows)}
                 self.live_seen = set(self.index)
-                self.rarity = self._rarity(vecs)
+                self.rarity = self._rarity_by_pack(vecs, rows)
                 for r, rar in zip(rows, self.rarity):
                     r["rarity"] = round(float(rar), 2)
                 self.ready, self.status = True, f"{len(rows)} segments indexed"
@@ -178,12 +183,24 @@ class Miner:
 
     @staticmethod
     def _rarity(vecs, k=10):
+        if len(vecs) < 2:
+            return np.full(len(vecs), 0.5)
         sims = vecs @ vecs.T
         np.fill_diagonal(sims, -1)
-        knn = np.sort(sims, axis=1)[:, -k:]
+        knn = np.sort(sims, axis=1)[:, -min(k, len(vecs) - 1):]
         dist = 1 - knn.mean(axis=1)                     # far from neighbours = rare
         ranks = dist.argsort().argsort()
         return ranks / max(len(ranks) - 1, 1)          # percentile 0..1
+
+    def _rarity_by_pack(self, vecs, rows):
+        """Rarity measured within each camera pack, so a warehouse clip isn't 'rare' just for being indoors."""
+        out = np.zeros(len(rows))
+        packs = {}
+        for i, r in enumerate(rows):
+            packs.setdefault(r["camera_id"] or "unknown", []).append(i)
+        for idx in packs.values():
+            out[idx] = self._rarity(vecs[idx])
+        return out
 
     def row(self, source):
         i = self.index.get(source)
@@ -278,6 +295,105 @@ class Miner:
         self.analysis[source] = result
         return result
 
+    # ---- mining agent: prompt -> phrases -> search -> Cosmos verifies -> clips + manifest ----
+    @op
+    def mine(self, prompt, condition=None, category=None, domain="all", n_check=8):
+        steps = []
+        ask = (f"A training-data engineer wants video clips of this edge case: '{prompt}'. The footage is dashcam, "
+               "highway, city street and warehouse CCTV, each 5-second clip described by a video model in plain "
+               "sentences. Write 3 short, different search phrases likely to match such descriptions. "
+               "Reply with only JSON: {\"phrases\": [\"...\", \"...\", \"...\"]}")
+        try:
+            client = wandb_llm()
+            text = (client.chat.completions.create(model=AGENT_MODEL, temperature=0.3,
+                                                   messages=[{"role": "user", "content": ask}]).choices[0].message.content
+                    if client else gpu.complete(ask, 300))
+            phrases = [p for p in gpu.parse_json(text).get("phrases", []) if isinstance(p, str)][:3]
+        except Exception as e:
+            print(f"[mine] phrase writing failed: {e}")
+            phrases = []
+        phrases = [prompt] + [p for p in phrases if p.lower() != prompt.lower()]
+        steps.append({"step": "Expanded the request into search phrases", "detail": phrases})
+
+        found = {}
+        for p in phrases:
+            try:
+                for h in self.vss.search(p, top_k=15).get("results", []):
+                    r = self.row(h.get("source"))
+                    if r and r["source"] not in found and domain in ("all", r["domain"]):
+                        found[r["source"]] = r
+            except Exception as e:
+                print(f"[mine] search '{p}' failed: {e}")
+        pool = list(found.values())
+        in_cond = [r for r in pool if condition and r["condition"] == condition]
+        pool = in_cond or pool
+        pool.sort(key=lambda r: ((category in r["categories"]) if category else False,
+                                 r["keyword_criticality"] + r.get("rarity", 0)), reverse=True)
+        cands = pool[:n_check]
+        steps.append({"step": "Searched the index",
+                      "detail": f"{len(found)} candidate clips" + (f", {len(in_cond)} in {condition.lower()} conditions" if condition else "")
+                                + f"; sending the best {len(cands)} to Cosmos"})
+
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            analyses = list(ex.map(lambda r: self._safe_analyze(r["source"]), cands))
+        checked, kept = [], []
+        for r, a in zip(cands, analyses):
+            crit = float(a.get("criticality", r["keyword_criticality"]) or 0)
+            ok = crit >= 0.5 or bool(a.get("near_miss"))
+            checked.append({"source": r["source"], "kept": ok, "criticality": round(crit, 2),
+                            "title": a.get("title") or (r["categories"][0] if r["categories"] else "Segment"),
+                            "reason": a.get("why") or a.get("maneuver") or ""})
+            if ok:
+                kept.append(self.card(r))
+        kept.sort(key=lambda c: c["score"], reverse=True)
+        steps.append({"step": "Cosmos3-Reason watched each clip", "detail": f"verified {len(kept)} of {len(checked)}"})
+        manifest = {"query": prompt, "condition": condition, "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                    "search_phrases": phrases, "verified_by": gpu.REASON_MODEL, "clip_count": len(kept),
+                    "clips": self.export_rows([c["source"] for c in kept])}
+        return {"query": prompt, "steps": steps, "checked": checked, "kept": kept, "manifest": manifest}
+
+    def fill_gap(self, category, condition):
+        return self.mine(f"{category} at {condition.lower()}", condition=condition, category=category)
+
+    def _safe_analyze(self, source):
+        try:
+            return self.analyze(source)
+        except Exception as e:
+            print(f"[analyze] {e}")
+            return {}
+
+    # ---- export ----
+    def export_rows(self, sources):
+        out = []
+        for s in sources:
+            r = self.row(s) or {"source": s}
+            c = self.card(r) if self.row(s) else {}
+            a = self.analysis.get(s, {})
+            out.append({
+                "clip_id": clip_id(s), "source": s, "original_video": r.get("original_video"),
+                "camera_id": r.get("camera_id"), "domain": r.get("domain"),
+                "start_sec": r.get("start_sec"), "end_sec": r.get("end_sec"), "title": c.get("title"),
+                "categories": r.get("categories"), "condition": r.get("condition"),
+                "danger": c.get("criticality"), "rarity": c.get("rarity"), "cosmos_said": r.get("description"),
+                "why_it_matters": c.get("why"),
+                "scenario": {k: a[k] for k in ("actors", "maneuver", "closest_gap", "occlusion", "lighting", "near_miss")
+                             if k in a} or None,
+            })
+        return out
+
+    def export_wandb(self, sources, name="longtail-training-set"):
+        """Publish the curated set as a versioned W&B Weave Dataset."""
+        if not (weave and os.environ.get("WANDB_API_KEY")):
+            raise RuntimeError("W&B isn't configured on the server (WANDB_API_KEY missing)")
+        rows = [{k: (json.dumps(v) if isinstance(v, (dict, list)) else v) for k, v in row.items()}
+                for row in self.export_rows(sources)]
+        ref = weave.publish(weave.Dataset(name=name, rows=rows))
+        entity = os.environ.get("WANDB_TEAM") or os.environ.get("WANDB_ENTITY", "")
+        project = os.environ.get("WANDB_PROJECT", "longtail")
+        digest = getattr(ref, "digest", None)
+        url = f"https://wandb.ai/{entity}/{project}/weave/objects/{name}" + (f"/versions/{digest}" if digest else "")
+        return {"rows": len(rows), "ref": ref.uri() if hasattr(ref, "uri") else str(ref), "url": url}
+
     # ---- coverage + live ----
     def coverage(self):
         cols = ["Day", "Dusk", "Night", "Rain", "Indoor"]
@@ -285,6 +401,7 @@ class Miner:
         for r in self.rows:
             for c in r["categories"]:
                 counts[c][r["condition"]] += 1
+        cols = [k for k in cols if any(counts[c][k] for c in CATEGORIES)]  # drop all-empty columns (e.g. Rain)
         return {"columns": cols, "rows": [{"category": c, "counts": [counts[c][k] for k in cols]} for c in CATEGORIES],
                 "total_segments": len(self.rows)}
 
