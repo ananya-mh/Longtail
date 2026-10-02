@@ -1,5 +1,9 @@
 # Longtail
 
+[![Longtail demo: click to watch the 2-minute narrated video](demo/longtail_preview.gif)](https://github.com/ananya-mh/Longtail/raw/main/demo/Longtail_explainer.mp4)
+
+*Preview loops automatically. Click it for the full 2-minute narrated demo.*
+
 **Self-driving and robotics models fail on the rare moments they've never seen. Longtail finds those moments in footage nobody has watched.**
 
 Describe a corner case in plain English ("a pedestrian steps out from behind a parked van"). Longtail's agent searches every indexed camera, has NVIDIA Cosmos watch the best candidates to verify them, ranks what's left by **danger × rarity**, and hands back playable clips plus a training-ready JSON manifest with clip IDs and start/end times.
