@@ -297,7 +297,7 @@ class Miner:
 
     # ---- mining agent: prompt -> phrases -> search -> Cosmos verifies -> clips + manifest ----
     @op
-    def mine(self, prompt, condition=None, category=None, domain="all", n_check=8):
+    def mine(self, prompt, condition=None, category=None, domain="all", n_check=12, n_extra=12):
         steps = []
         ask = (f"A training-data engineer wants video clips of this edge case: '{prompt}'. The footage is dashcam, "
                "highway, city street and warehouse CCTV, each 5-second clip described by a video model in plain "
@@ -334,23 +334,51 @@ class Miner:
                       "detail": f"{len(found)} candidate clips" + (f", {len(in_cond)} in {condition.lower()} conditions" if condition else "")
                                 + f"; sending the best {len(cands)} to Cosmos"})
 
-        with ThreadPoolExecutor(max_workers=8) as ex:
-            analyses = list(ex.map(lambda r: self._safe_analyze(r["source"]), cands))
+        with ThreadPoolExecutor(max_workers=12) as ex:
+            analyses = list(ex.map(lambda r: self._verify(r, prompt), cands))
         checked, kept = [], []
         for r, a in zip(cands, analyses):
             crit = float(a.get("criticality", r["keyword_criticality"]) or 0)
-            ok = crit >= 0.5 or bool(a.get("near_miss"))
+            # Keep what matches the request; danger x rarity only ranks. If Cosmos didn't answer the
+            # match question, fall back to "looks like an edge case".
+            ok = a["matches_request"] if isinstance(a.get("matches_request"), bool) else (crit >= 0.5 or bool(a.get("near_miss")))
             checked.append({"source": r["source"], "kept": ok, "criticality": round(crit, 2),
                             "title": a.get("title") or (r["categories"][0] if r["categories"] else "Segment"),
                             "reason": a.get("why") or a.get("maneuver") or ""})
             if ok:
-                kept.append(self.card(r))
+                kept.append({**self.card(r), "verified": True})
         kept.sort(key=lambda c: c["score"], reverse=True)
-        steps.append({"step": "Cosmos3-Reason watched each clip", "detail": f"verified {len(kept)} of {len(checked)}"})
+        steps.append({"step": "Cosmos3-Reason watched each clip", "detail": f"{len(kept)} of {len(checked)} match the request"})
+        extra = [{**self.card(r), "verified": False} for r in pool[n_check:n_check + n_extra]]
+        extra.sort(key=lambda c: c["score"], reverse=True)
+        if extra:
+            steps.append({"step": "More search matches", "detail": f"{len(extra)} more clips, not yet verified by Cosmos"})
+        results = kept + extra
+        clips = self.export_rows([c["source"] for c in results])
+        for row, c in zip(clips, results):
+            row["verified"] = c["verified"]
         manifest = {"query": prompt, "condition": condition, "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-                    "search_phrases": phrases, "verified_by": gpu.REASON_MODEL, "clip_count": len(kept),
-                    "clips": self.export_rows([c["source"] for c in kept])}
-        return {"query": prompt, "steps": steps, "checked": checked, "kept": kept, "manifest": manifest}
+                    "search_phrases": phrases, "verified_by": gpu.REASON_MODEL, "clip_count": len(clips),
+                    "verified_count": len(kept), "clips": clips}
+        return {"query": prompt, "steps": steps, "checked": checked, "kept": results, "manifest": manifest}
+
+    def _verify(self, r, prompt):
+        """Cosmos watches the clip with the request in mind; result also fills the inspector cache."""
+        try:
+            a = gpu.analyze_clip(self.vss.clip_bytes(r["source"]), r["description"][:800], request=prompt)
+            a["analyzed_by"] = gpu.REASON_MODEL
+        except Exception as e:
+            print(f"[verify] {e}")
+            return self._safe_analyze(r["source"])
+        if r["source"] not in self.analysis:
+            try:
+                det = self.vss.detections(r["source"])
+            except Exception:
+                det = None
+            a["yolo_gap"] = gap_from_detections(det)
+            a["yolo_objects"] = sorted({l for l in re.findall(r'"(?:class_name|label)":\s*"([^"]+)"', json.dumps(det or {}))})
+            self.analysis[r["source"]] = {k: v for k, v in a.items() if k != "matches_request"}
+        return a
 
     def fill_gap(self, category, condition):
         return self.mine(f"{category} at {condition.lower()}", condition=condition, category=category)

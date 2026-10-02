@@ -347,7 +347,7 @@ async function runAgent(call, list) {
 function showManifest(m) {
   state.manifest = m;
   const name = "longtail_" + m.query.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 40) + ".json";
-  $("#mineJsonName").textContent = `${name} · ${m.clip_count} clips`;
+  $("#mineJsonName").textContent = `${name} · ${m.clip_count} clips (${m.verified_count} verified)`;
   $("#mineJsonBody").textContent = JSON.stringify(m, null, 2);
   $("#mineJson").hidden = false;
   state.manifestName = name;
@@ -369,7 +369,7 @@ async function load() {
         body: JSON.stringify({ prompt: state.query, domain: state.domain }) }), $("#mineSteps"));
       state.cards = job.kept;
       $("#resultEyebrow").textContent = "verified by Cosmos3-Reason";
-      $("#resultTitle").textContent = `${job.kept.length} verified clips for "${state.query}"`;
+      $("#resultTitle").textContent = `${job.manifest.verified_count} verified · ${job.kept.length - job.manifest.verified_count} more matches for "${state.query}"`;
       showManifest(job.manifest);
     } else {
       state.cards = await api(`api/top?${d}`);
@@ -394,7 +394,7 @@ function renderCards() {
     return `<article class="clip ${state.open === c.source ? "selected" : ""}" data-i="${i}">
       <div class="thumb">
         <video src="${clipUrl(c.source)}#t=1" muted loop playsinline preload="metadata"></video>
-        <span class="pill" style="--c:${color}">${c.score.toFixed(2)}</span>
+        <span class="pill" style="--c:${color}">${c.verified ? "✓ " : c.verified === false ? "unverified · " : ""}${c.score.toFixed(2)}</span>
         <button class="add" data-act="add" aria-pressed="${inSet}" aria-label="${inSet ? "Remove from" : "Add to"} training set">${inSet ? "✓" : "+"}</button>
       </div>
       <div>

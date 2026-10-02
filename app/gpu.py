@@ -44,10 +44,15 @@ training-data team. Watch the clip and reply with only JSON:
  "why": "<one sentence: why this is hard for a self-driving car or robot>"}"""
 
 
-def analyze_clip(video_bytes, context=""):
-    """Cosmos3-Reason watches the actual segment and returns a structured scenario."""
+def analyze_clip(video_bytes, context="", request=None):
+    """Cosmos3-Reason watches the actual segment and returns a structured scenario.
+    With `request`, it also judges whether the clip shows what was asked for."""
     b64 = base64.b64encode(video_bytes).decode()
-    content = [{"type": "text", "text": SCENARIO_PROMPT + (f"\nExisting caption: {context}" if context else "")},
+    text = SCENARIO_PROMPT
+    if request:
+        text = text.rstrip("}") + (',\n "matches_request": true | false  (does the clip clearly show: '
+                                   f'"{request}"?)}}')
+    content = [{"type": "text", "text": text + (f"\nExisting caption: {context}" if context else "")},
                {"type": "video_url", "video_url": {"url": f"data:video/mp4;base64,{b64}"}}]
     r = requests.post(f"{REASON_URL}/v1/chat/completions", headers=_headers(), timeout=180, json={
         "model": REASON_MODEL, "messages": [{"role": "user", "content": content}],
