@@ -28,6 +28,8 @@ Built for the VAST Builders Challenge (San Francisco, Oct 2 2026) on team-21's p
 
 ## How it works
 
+![Longtail architecture](demo/architecture.png)
+
 ```
                      ┌───────────── pre-built, already running (VAST + CoreWeave) ─────────────┐
  S3 video chunks ──► │ DataEngine: segment (5 s) → YOLO11 → Cosmos3-Reason caption → Cosmos-Embed1 │ ──► VastDB
