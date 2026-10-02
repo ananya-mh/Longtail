@@ -1,7 +1,7 @@
 """Read-only probe of team VSS backend + GPU models. Run on the workshop VM:
     python3 tools/probe.py
 Prints response shapes and sample captions; never prints passwords or tokens."""
-import glob, json, re, urllib.parse, urllib.request
+import glob, json, os, re, urllib.error, urllib.parse, urllib.request
 
 configs = glob.glob('/config/*.config')
 if not configs:
@@ -29,12 +29,15 @@ def section(title, fn):
     print(f'\n== {title}')
     try:
         fn()
+    except urllib.error.HTTPError as e:
+        print('ERROR:', e, '|', e.read()[:800])
     except Exception as e:
         print('ERROR:', e)
 
 
 TOK = call('/auth/login', {'username': cfg['USERNAME'], 'password': cfg['PASSWORD']})['access_token']
 print('team:', cfg.get('USERNAME'), '| config keys:', sorted(cfg))
+print('env WANDB/COSMOS names:', sorted(k for k in os.environ if k.startswith(('WANDB', 'COSMOS', 'YOLO'))))
 section('schema', lambda: print(cut(call('/metadata/schema'), 2500)))
 section('stats', lambda: print(cut(call('/dashboard/stats'), 1500)))
 
@@ -47,9 +50,21 @@ section('explore', explore)
 first = {}
 
 
+SEARCH_BODY = {}
+
+
 def search():
-    s = call('/search', {'query': 'pedestrian steps into the road in front of the car', 'top_k': 3,
-                         'llm_top_n': 0, 'min_similarity': 0.1})
+    q = 'pedestrian steps into the road in front of the car'
+    variants = [{'query': q}, {'query': q, 'top_k': 3}, {'query': q, 'top_k': 3, 'min_similarity': 0.1},
+                {'query': q, 'top_k': 3, 'llm_top_n': 1, 'min_similarity': 0.1}]
+    s = None
+    for v in variants:
+        try:
+            s = call('/search', v); print('OK body:', v); SEARCH_BODY.update({k: x for k, x in v.items() if k != 'query'})
+        except urllib.error.HTTPError as e:
+            print('FAIL body:', v, '->', e.code, e.read()[:600])
+    if s is None:
+        return
     print('keys', list(s))
     r = (s.get('results') or [{}])[0]
     first.update(r)
@@ -63,7 +78,7 @@ if first.get('source'):
 
 for q in ['vehicle cuts in close in front', 'forklift near a person', 'car reversing at night']:
     def sample(q=q):
-        s = call('/search', {'query': q, 'top_k': 3, 'llm_top_n': 0, 'min_similarity': 0.1})
+        s = call('/search', {**SEARCH_BODY, 'query': q})
         for x in s.get('results', []):
             print(' ', round(x.get('similarity_score') or 0, 3), x.get('camera_id'), '|',
                   (x.get('reasoning_content') or '')[:220].replace('\n', ' '))
