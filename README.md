@@ -1,8 +1,10 @@
 # Longtail
 
-[![Longtail demo: click to watch the 2-minute narrated video](demo/longtail_preview.gif)](https://github.com/ananya-mh/Longtail/raw/main/demo/Longtail_explainer.mp4)
+![Longtail preview](demo/longtail_preview.gif)
 
-*Preview loops automatically. Click it for the full 2-minute narrated demo.*
+**Full 2-minute narrated demo:**
+
+https://github.com/user-attachments/assets/44209625-b7a6-438d-94fa-66771338f1ea
 
 **Self-driving and robotics models fail on the rare moments they've never seen. Longtail finds those moments in footage nobody has watched.**
 
