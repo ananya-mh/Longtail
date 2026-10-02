@@ -3,7 +3,11 @@
 Prints response shapes and sample captions; never prints passwords or tokens."""
 import glob, json, re, urllib.parse, urllib.request
 
-cfg = {m[1]: m[2].strip().strip('"\'') for l in open(glob.glob('/config/*.config')[0])
+configs = glob.glob('/config/*.config')
+if not configs:
+    raise SystemExit('No /config/*.config found. Run this inside the workshop VM terminal '
+                     '(the browser desktop from "Open Desktop"), not on your laptop.')
+cfg = {m[1]: m[2].strip().strip('"\'') for l in open(configs[0])
        if (m := re.match(r'\s*([A-Z0-9_]+)=(.*)', l))}
 B = cfg['INGRESS_URL'].rstrip('/') + '/api/v1'
 TOK = None
