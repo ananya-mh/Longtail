@@ -144,130 +144,160 @@ footer { margin-top: 64px; font: 12px var(--mono); color: var(--muted); }
   .hero, .export { grid-template-columns: 1fr; gap: 32px; padding-block: 40px; }
   nav.top { flex-wrap: wrap; } .tabs { margin-inline: 0; order: 3; width: 100%; }
 }
+
+/* ---- minimal pass ---- */
+body { padding-block: 8px 96px; }
+.wrap { max-width: 1080px; }
+nav.top { background: rgba(255,255,255,.92); border-bottom: 1px solid var(--line); border-radius: 0; padding: 14px 0; top: env(safe-area-inset-top, 0px); }
+.brand { font-size: 20px; }
+.tabs button { padding: 4px 2px; margin: 0 10px; border-radius: 0; background: none !important; box-shadow: none !important; }
+.tabs button[aria-selected="true"] { color: var(--ink); box-shadow: inset 0 -1px 0 var(--ink) !important; }
+.setlink { font: 13px var(--mono); color: var(--muted); }
+.setlink span { color: var(--ink); }
+.hero { display: block; max-width: 680px; margin-inline: auto; text-align: center; padding-block: 96px 64px; }
+.hero h1 { font-size: clamp(40px, 6vw, 64px); }
+.lede { color: var(--muted); margin: 12px 0 0; }
+.hero p.lede { max-width: none; }
+.hero .searchrow { margin-top: 36px; border: 1px solid var(--line); border-radius: 12px; padding: 6px 6px 6px 16px; background: #fff; }
+.hero .searchrow:focus-within { border-color: var(--ink); }
+.suggest { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 16px; margin-top: 14px; padding: 0; }
+.suggest button { width: auto; padding: 2px 0; font-size: 13px; color: var(--muted); }
+.suggest button:hover { background: none; color: var(--ink); }
+.suggest svg { display: none; }
+.filters { justify-content: center; margin-top: 18px; gap: 2px; }
+.chip { background: none; font-size: 13px; padding: 4px 10px; }
+.chip[aria-pressed="true"] { background: var(--surface); color: var(--ink); }
+.hero .status { justify-content: center; margin-top: 28px; }
+.section-head { align-items: baseline; justify-content: flex-start; gap: 14px; margin: 0 0 20px; }
+.section-head h2 { font-size: 24px; }
+.muted { color: var(--muted); font-size: 13px; margin: 0; }
+.textbtn { color: var(--muted); font-size: 13px; padding: 4px 0; }
+.textbtn:hover { color: var(--ink); }
+#similarReset { margin-left: auto; }
+.btn.small { padding: 6px 12px; font-size: 13px; }
+.steps { font-size: 13px; margin-bottom: 20px; }
+.grid { gap: 32px 20px; }
+.pill { background: rgba(255,255,255,.9); }
+.manifest { margin-top: 40px; border-radius: 12px; }
+.bar-actions { display: flex; gap: 14px; align-items: center; }
+.manifest pre { max-height: 420px; background: #fff; }
+.page-head { padding-block: 72px 28px; text-align: left; }
+.page-head h1 { font-size: 40px; }
+.cov { overflow-x: auto; }
+.heat td { border-radius: 6px; }
+.gap-panel { border: 0; border-top: 1px solid var(--line); border-radius: 0; padding: 28px 0 0; margin-top: 36px; }
+.gap-panel .section-head h2 { margin-right: auto; }
+h2.sub { font-size: 20px; margin-top: 44px; }
+.row { display: flex; gap: 12px; align-items: center; margin-top: 18px; }
+.drawer { gap: 14px; }
+.drawer h2 { font-size: 24px; margin-top: 4px; }
+.metrics { margin: 0; font-size: 14px; color: var(--muted); display: flex; gap: 8px; flex-wrap: wrap; }
+.metrics b { color: var(--ink); font-weight: 500; font-variant-numeric: tabular-nums; }
+details summary { cursor: pointer; font-size: 13px; color: var(--muted); list-style: none; }
+details summary::before { content: "▸ "; }
+details[open] summary::before { content: "▾ "; }
+details > *:not(summary) { margin-top: 8px; }
+.drawer .actions { align-items: center; gap: 18px; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <nav class="top" aria-label="Main">
-    <div class="brand"><i></i>Longtail</div>
+    <div class="brand">Longtail</div>
     <div class="tabs" role="tablist">
       <button role="tab" id="t-mine" aria-selected="true">Mine</button>
       <button role="tab" id="t-coverage" aria-selected="false">Coverage</button>
       <button role="tab" id="t-export" aria-selected="false">Export</button>
     </div>
-    <button class="btn primary" id="setBtn">Training set<span class="count" id="setCount">0</span></button>
+    <button class="setlink" id="setBtn">Set <span id="setCount">0</span></button>
   </nav>
 
   <section id="v-mine">
     <div class="hero">
-      <div>
-        <p class="eyebrow">Edge-case mining for physical AI</p>
-        <h1 style="margin-top:14px">Find the moments <span class="ghost">your model hasn't seen.</span></h1>
-        <p class="lede">Describe a scenario in plain words. Longtail searches hours of driving, highway and warehouse footage and ranks every match by how critical and how rare it is.</p>
-        <p class="status" style="margin-top:18px"><span class="pulse" id="statusDot"></span><span id="statusText">Connecting…</span></p>
-      </div>
-      <div class="stage">
-        <div class="searchcard">
-          <form class="searchrow" id="searchForm" role="search">
-            <input id="q" type="text" placeholder="Describe the corner case to mine…" autocomplete="off" aria-label="Corner case to mine">
-            <button class="btn primary" type="submit">Mine</button>
-          </form>
-          <ul class="suggest" id="suggest"></ul>
-        </div>
-        <div class="filters" id="filters" aria-label="Footage type"></div>
-      </div>
+      <h1>Mine the long tail.</h1>
+      <p class="lede">Describe a corner case. Get verified clips and a training-ready JSON.</p>
+      <form class="searchrow" id="searchForm" role="search">
+        <input id="q" type="text" placeholder="a pedestrian steps out from behind a parked van" autocomplete="off" aria-label="Corner case to mine">
+        <button class="btn primary" type="submit">Mine</button>
+      </form>
+      <ul class="suggest" id="suggest"></ul>
+      <div class="filters" id="filters" aria-label="Footage type"></div>
+      <p class="status"><span class="pulse" id="statusDot"></span><span id="statusText">Connecting…</span></p>
     </div>
 
     <div class="section-head">
-      <div><p class="eyebrow" id="resultEyebrow">Ranked by criticality and rarity</p><h2 id="resultTitle" style="margin-top:6px">Top edge cases</h2></div>
-      <button class="btn line" id="similarReset" hidden>Back to all results</button>
+      <h2 id="resultTitle">Top edge cases</h2>
+      <span class="muted" id="resultEyebrow"></span>
+      <button class="textbtn" id="similarReset" hidden>← All results</button>
     </div>
-    <ol class="steps" id="mineSteps" hidden style="margin-bottom:24px"></ol>
+    <ol class="steps" id="mineSteps" hidden></ol>
     <div class="grid" id="results"></div>
-    <div class="manifest" id="mineJson" hidden style="margin-top:32px">
+    <div class="manifest" id="mineJson" hidden>
       <div class="bar"><span id="mineJsonName">mine.json</span>
-        <span style="display:flex;gap:6px">
-          <button class="btn soft" id="mineAddAll" style="padding:5px 12px">Add all to set</button>
-          <button class="btn soft" id="mineCopy" style="padding:5px 12px">Copy</button>
-          <button class="btn primary" id="mineDownload" style="padding:5px 12px">Download JSON</button>
+        <span class="bar-actions">
+          <button class="textbtn" id="mineAddAll">Add all to set</button>
+          <button class="textbtn" id="mineCopy">Copy</button>
+          <button class="btn primary small" id="mineDownload">Download JSON</button>
         </span>
       </div>
-      <pre class="json" id="mineJsonBody" style="max-height:420px"></pre>
+      <pre class="json" id="mineJsonBody"></pre>
     </div>
   </section>
 
   <section id="v-coverage" hidden>
     <div class="page-head">
-      <p class="eyebrow">Coverage</p>
-      <h1 style="margin-top:14px">Where your data <span class="ghost">runs thin.</span></h1>
-      <p id="covLede">Clips per scenario and condition across the indexed corpus. Dashed cells have no examples yet: footage to collect, or a scenario to synthesize.</p>
+      <h1>Coverage</h1>
+      <p class="lede" id="covLede">Clips per scenario and condition. Click a cell to let the agent fill it.</p>
     </div>
-    <div class="stage cov">
+    <div class="cov">
       <table class="heat" id="heat"></table>
-      <div class="legend">
-        <span><i style="background:#fff"></i>1–3 clips</span><span><i style="background:var(--mint-strong)"></i>4–19</span>
-        <span><i style="background:var(--signal)"></i>20 or more</span><span><i style="border:1px dashed var(--critical)"></i>Gap</span>
-        <span>Click a cell to fill it</span>
-      </div>
     </div>
     <div id="gapPanel" class="gap-panel" hidden>
-      <div class="section-head" style="margin:0 0 12px">
-        <div><p class="eyebrow">Agent</p><h2 id="gapTitle" style="margin-top:6px"></h2></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn primary" id="gapRun">Fill this gap</button>
-          <button class="btn soft" id="gapAddAll" hidden>Add kept clips to set</button>
-        </div>
+      <div class="section-head">
+        <h2 id="gapTitle"></h2>
+        <button class="btn primary small" id="gapRun">Fill this gap</button>
+        <button class="textbtn" id="gapAddAll" hidden>Add kept clips to set</button>
       </div>
       <ol class="steps" id="gapSteps"></ol>
-      <div class="grid" id="gapResults" style="margin-top:20px"></div>
+      <div class="grid" id="gapResults"></div>
     </div>
   </section>
 
   <section id="v-export" hidden>
     <div class="page-head">
-      <p class="eyebrow">Export</p>
-      <h1 style="margin-top:14px">Send a curated set <span class="ghost">to labeling.</span></h1>
+      <h1>Training set</h1>
+      <p class="lede">Clips you've kept, ready for labeling.</p>
     </div>
     <div class="export">
       <div>
-        <h2 style="font-size:22px">In this set</h2>
         <ul class="setlist" id="setList"></ul>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">
-          <button class="btn primary" id="wandbBtn">Export to W&amp;B</button>
-        </div>
-        <p id="wandbOut" class="status" style="margin-top:10px"></p>
-        <h2 style="font-size:22px;margin-top:40px">Live watch</h2>
-        <p style="color:var(--muted);margin:6px 0 0">Segments re-ingested since the app started are screened as they land. Likely edge cases show up here.</p>
+        <p class="row"><button class="btn primary small" id="wandbBtn">Export to W&amp;B</button><span id="wandbOut" class="muted"></span></p>
+        <h2 class="sub">Live watch</h2>
         <div class="livefeed" id="liveFeed"></div>
       </div>
       <div class="manifest">
-        <div class="bar"><span>manifest.jsonl</span><button class="btn soft" id="copyManifest" style="padding:5px 12px">Copy</button></div>
+        <div class="bar"><span>manifest.jsonl</span><button class="textbtn" id="copyManifest">Copy</button></div>
         <pre class="json" id="manifest"></pre>
       </div>
     </div>
   </section>
-
-  <footer>Longtail · NVIDIA Cosmos3-Reason, Cosmos-Embed1, YOLO11 · VAST AI OS · CoreWeave · <span id="llmName">W&amp;B</span></footer>
+  <span id="llmName" hidden></span>
 </div>
 
 <div class="scrim" id="scrim" hidden></div>
 <aside class="drawer" id="drawer" hidden aria-labelledby="dTitle">
   <header>
-    <div><p class="eyebrow" id="dCam"></p><h2 id="dTitle" style="margin-top:6px"></h2></div>
+    <div><p class="muted" id="dCam"></p><h2 id="dTitle"></h2></div>
     <button class="close" id="dClose" aria-label="Close">×</button>
   </header>
   <video id="dVideo" controls muted autoplay loop playsinline></video>
-  <div class="stats">
-    <div><span class="eyebrow">Criticality</span><b id="dCrit"></b></div>
-    <div><span class="eyebrow">Rarity</span><b id="dRare"></b></div>
-    <div><span class="eyebrow">Closest gap</span><b id="dGap" style="font-size:18px"></b></div>
-  </div>
-  <div><p class="eyebrow">Why it's an edge case</p><p class="body" id="dWhy"></p></div>
-  <div><p class="eyebrow">Cosmos caption</p><p class="body" id="dCaption" style="color:var(--muted)"></p></div>
-  <div><p class="eyebrow" style="margin-bottom:8px" id="dJsonLabel">scenario.json</p><pre class="json" id="json"></pre></div>
+  <p class="metrics">Danger <b id="dCrit"></b><span>·</span>Rarity <b id="dRare"></b><span>·</span>Gap <b id="dGap"></b></p>
+  <p id="dWhy"></p>
+  <details><summary>What Cosmos saw</summary><p class="muted" id="dCaption"></p></details>
+  <details open><summary id="dJsonLabel">scenario.json</summary><pre class="json" id="json"></pre></details>
   <div class="actions">
     <button class="btn primary" id="dAdd">Add to training set</button>
-    <button class="btn line" id="dSimilar">Find similar</button>
+    <button class="textbtn" id="dSimilar">Find similar →</button>
   </div>
 </aside>
 
@@ -330,20 +360,20 @@ async function load() {
   try {
     if (state.similarTo) {
       state.cards = await api(`api/similar?source=${encodeURIComponent(state.similarTo.source)}&${d}`);
-      $("#resultEyebrow").textContent = "Nearest neighbours in Cosmos-Embed space";
+      $("#resultEyebrow").textContent = "nearest neighbours";
       $("#resultTitle").textContent = `More like "${state.similarTo.title}"`;
     } else if (state.query) {
-      $("#resultEyebrow").textContent = "Mining agent";
+      $("#resultEyebrow").textContent = "agent working";
       $("#resultTitle").textContent = `Mining "${state.query}"…`;
       const job = await runAgent(() => api("api/mine", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: state.query, domain: state.domain }) }), $("#mineSteps"));
       state.cards = job.kept;
-      $("#resultEyebrow").textContent = "Verified by Cosmos3-Reason · ranked by criticality and rarity";
+      $("#resultEyebrow").textContent = "verified by Cosmos3-Reason";
       $("#resultTitle").textContent = `${job.kept.length} verified clips for "${state.query}"`;
       showManifest(job.manifest);
     } else {
       state.cards = await api(`api/top?${d}`);
-      $("#resultEyebrow").textContent = "Ranked by criticality and rarity";
+      $("#resultEyebrow").textContent = "ranked by danger × rarity";
       $("#resultTitle").textContent = "Top edge cases";
     }
     renderCards();
@@ -364,13 +394,12 @@ function renderCards() {
     return `<article class="clip ${state.open === c.source ? "selected" : ""}" data-i="${i}">
       <div class="thumb">
         <video src="${clipUrl(c.source)}#t=1" muted loop playsinline preload="metadata"></video>
-        <span class="pill" style="--c:${color}">${label} · ${c.score.toFixed(2)}</span>
+        <span class="pill" style="--c:${color}">${c.score.toFixed(2)}</span>
         <button class="add" data-act="add" aria-pressed="${inSet}" aria-label="${inSet ? "Remove from" : "Add to"} training set">${inSet ? "✓" : "+"}</button>
       </div>
       <div>
         <h3><a href="#" style="color:inherit;text-decoration:none">${esc(c.title)}</a></h3>
         <div class="meta" style="margin-top:4px"><span>${esc(c.camera_id || "camera")}</span><span>${fmtT(c.start_sec)}</span></div>
-        ${c.categories?.length ? `<div class="cat" style="margin-top:2px">${esc(c.categories.join(" · "))}</div>` : ""}
       </div>
     </article>`;
   }).join("");
