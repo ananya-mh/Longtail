@@ -1,0 +1,491 @@
+<title>Long Tail</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500&family=Geist:wght@400;500;600&family=Fragment+Mono&display=swap">
+<style>
+/* Layout: floating pill nav over a white canvas; mint "stage" panels hold the working surfaces (search, frame + scenario.json); editorial serif heads each view. */
+:root {
+  --bg: #ffffff;
+  --surface: #f7fbf8;
+  --mint: #ebf5ed;
+  --mint-strong: #d1eee0;
+  --ink: #0b0d0c;
+  --muted: #7b847f;
+  --faint: #b9c1bc;
+  --line: #e3ebe5;
+  --card: #ffffff;
+  --signal: #19c37d;      /* box overlays / live */
+  --critical: #e5484d;
+  --warn: #e8a317;
+  --calm: #3e9b6f;
+  --code-key: #0b0d0c;
+  --code-str: #2f9e6a;
+  --display: "Newsreader", "Iowan Old Style", Georgia, serif;
+  --sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Fragment Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --radius: 14px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0c0f0d; --surface: #121614; --mint: #15201a; --mint-strong: #1d3127;
+    --ink: #edf2ee; --muted: #8d978f; --faint: #4d5750; --line: #222a25; --card: #101411;
+    --code-key: #edf2ee; --code-str: #5fd6a0; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0c0f0d; --surface: #121614; --mint: #15201a; --mint-strong: #1d3127;
+  --ink: #edf2ee; --muted: #8d978f; --faint: #4d5750; --line: #222a25; --card: #101411;
+  --code-key: #edf2ee; --code-str: #5fd6a0; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--sans); padding-inline: 20px; padding-block: 16px 64px; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.wrap { max-width: 1240px; margin-inline: auto; }
+
+/* nav */
+nav.top { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 8px); z-index: 10; display: flex; align-items: center; gap: 16px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(8px);
+  border-radius: 12px; padding: 10px 12px 10px 18px; }
+.brand { display: flex; align-items: center; gap: 9px; font: 500 22px/1 var(--display); letter-spacing: -.01em; white-space: nowrap; }
+.brand svg { width: 22px; height: 22px; }
+.tabs { display: flex; gap: 4px; margin-inline: auto; flex-wrap: wrap; }
+.tabs button { background: none; border: 0; padding: 7px 12px; border-radius: 8px; color: var(--muted); }
+.tabs button[aria-selected="true"] { color: var(--ink); background: var(--mint); }
+.btn { border: 0; border-radius: 8px; padding: 9px 14px; font-weight: 500; white-space: nowrap; }
+.btn.primary { background: var(--ink); color: var(--bg); }
+.btn.soft { background: var(--mint-strong); color: var(--ink); }
+.btn.line { background: transparent; border: 1px solid var(--line); }
+.count { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; margin-left: 6px; border-radius: 10px;
+  background: var(--signal); color: #04140c; font: 12px var(--mono); }
+
+.eyebrow { font: 12px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+h1, h2 { font-family: var(--display); font-weight: 400; letter-spacing: -.015em; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(34px, 5vw, 56px); line-height: 1.05; }
+h1 .ghost { color: var(--faint); }
+h2 { font-size: clamp(24px, 3vw, 32px); line-height: 1.15; }
+.lede { color: var(--muted); max-width: 52ch; margin: 12px 0 0; }
+.sample { display: inline-flex; gap: 6px; align-items: center; font: 11px var(--mono); color: var(--muted); border: 1px dashed var(--faint); border-radius: 6px; padding: 2px 7px; }
+
+/* hero + search stage */
+.hero { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 32px; align-items: center; padding-block: 48px 32px; }
+.stage { background: var(--mint); border-radius: 20px; padding: clamp(16px, 4vw, 40px); }
+.searchcard { background: var(--card); border-radius: var(--radius); padding: 18px 20px 8px; box-shadow: 0 1px 0 var(--line), 0 18px 40px -24px rgba(20, 60, 40, .35); }
+.searchrow { display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); padding-bottom: 12px; }
+.searchrow input { flex: 1; min-width: 0; border: 0; background: transparent; font: 17px var(--sans); color: var(--ink); outline: none; }
+.searchrow input::placeholder { color: var(--faint); }
+.suggest { list-style: none; margin: 0; padding: 4px 0; }
+.suggest li button { width: 100%; display: grid; grid-template-columns: 18px 1fr 16px; gap: 12px; align-items: center; text-align: left;
+  background: none; border: 0; padding: 9px 2px; border-radius: 6px; }
+.suggest li button:hover { background: var(--surface); }
+.suggest svg { color: var(--faint); }
+.filters { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.chip { font: 12px var(--mono); border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 4px 10px; color: var(--muted); }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+/* results */
+.section-head { display: flex; align-items: end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin: 32px 0 16px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+.clip { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; transition: border-color .15s, transform .15s; }
+.clip:hover { border-color: var(--mint-strong); transform: translateY(-2px); }
+.clip.selected { border-color: var(--signal); box-shadow: 0 0 0 1px var(--signal); }
+.clip canvas { width: 100%; aspect-ratio: 16 / 9; display: block; max-width: 100%; }
+.clip .body { padding: 12px 14px 14px; display: grid; gap: 8px; flex: 1; }
+.clip h3 { margin: 0; font: 500 15px/1.3 var(--sans); }
+.meta { font: 12px var(--mono); color: var(--muted); display: flex; gap: 8px; flex-wrap: wrap; }
+.tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.tag { font: 11px var(--mono); background: var(--mint); border-radius: 4px; padding: 2px 6px; }
+.scores { display: grid; grid-template-columns: auto 1fr auto; gap: 4px 8px; align-items: center; font: 11px var(--mono); color: var(--muted); }
+.bar { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--ink); }
+.sev { display: inline-flex; align-items: center; gap: 5px; font: 11px var(--mono); text-transform: uppercase; letter-spacing: .04em; }
+.sev::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: currentColor; }
+.sev.s3 { color: var(--critical); } .sev.s2 { color: var(--warn); } .sev.s1 { color: var(--calm); }
+.clip .actions { display: flex; gap: 6px; margin-top: auto; padding-top: 4px; }
+.clip .actions .btn { padding: 6px 10px; font-size: 13px; }
+.empty { border: 1px dashed var(--faint); border-radius: var(--radius); padding: 32px; text-align: center; color: var(--muted); grid-column: 1 / -1; }
+
+/* inspector: frame + scenario.json */
+.inspector { margin-top: 32px; }
+.inspect-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 0; border-radius: var(--radius); overflow: hidden; background: #000; }
+.inspect-grid canvas { width: 100%; height: 100%; display: block; aspect-ratio: 16 / 9; max-width: 100%; }
+.jsonpane { background: var(--card); display: flex; flex-direction: column; min-width: 0; }
+.jsonpane .titlebar { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); font: 12px var(--mono); }
+.jsonpane pre { margin: 0; padding: 12px 14px; font: 12px/1.75 var(--mono); overflow: auto; flex: 1; counter-reset: ln; }
+.jsonpane pre span.l { display: block; counter-increment: ln; }
+.jsonpane pre span.l::before { content: counter(ln); display: inline-block; width: 2.2em; color: var(--faint); }
+.k { color: var(--code-key); } .s { color: var(--code-str); } .n { color: var(--warn); }
+.why { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
+.why div { background: var(--surface); border-radius: var(--radius); padding: 14px 16px; }
+.why p { margin: 6px 0 0; }
+
+/* coverage */
+.cov { overflow-x: auto; }
+table.heat { border-collapse: separate; border-spacing: 4px; width: 100%; min-width: 640px; font-variant-numeric: tabular-nums; }
+.heat th { font: 12px var(--mono); color: var(--muted); font-weight: 400; text-align: left; padding: 6px; }
+.heat td { border-radius: 8px; height: 52px; text-align: center; font: 500 15px var(--sans); }
+.heat td.gap { background: transparent; border: 1px dashed var(--critical); color: var(--critical); font: 12px var(--mono); }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font: 12px var(--mono); color: var(--muted); margin-top: 12px; }
+.legend i { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 5px; }
+
+/* export */
+.export { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 24px; align-items: start; }
+.setlist { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.setlist li { display: flex; justify-content: space-between; gap: 12px; align-items: center; background: var(--surface); border-radius: 10px; padding: 10px 12px; }
+.setlist li span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.livefeed { display: grid; gap: 8px; margin-top: 16px; }
+.livefeed div { display: flex; gap: 10px; align-items: baseline; font: 12px var(--mono); color: var(--muted); }
+.livefeed b { color: var(--ink); font-weight: 400; }
+.pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--signal); box-shadow: 0 0 0 0 var(--signal); animation: pulse 1.8s infinite; flex: none; align-self: center; }
+@keyframes pulse { 70% { box-shadow: 0 0 0 8px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+@media (prefers-reduced-motion: reduce) { .pulse { animation: none; } .clip { transition: none; } }
+
+[role="tabpanel"][hidden] { display: none !important; }
+@media (max-width: 860px) {
+  .hero, .inspect-grid, .export, .why { grid-template-columns: 1fr; }
+  .tabs { margin-inline: 0; order: 3; width: 100%; }
+  nav.top { flex-wrap: wrap; }
+}
+</style>
+
+<div class="wrap">
+  <nav class="top" aria-label="Main">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18 C 8 18, 9 6, 13 6 S 18 14, 21 14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><circle cx="21" cy="14" r="2.2" fill="var(--signal)"/></svg>
+      Long Tail
+    </div>
+    <div class="tabs" role="tablist">
+      <button role="tab" aria-selected="true" aria-controls="v-mine" id="t-mine">Mine</button>
+      <button role="tab" aria-selected="false" aria-controls="v-coverage" id="t-coverage">Coverage</button>
+      <button role="tab" aria-selected="false" aria-controls="v-export" id="t-export">Export</button>
+    </div>
+    <button class="btn primary" id="exportBtn">Training set<span class="count" id="setCount">0</span></button>
+  </nav>
+
+  <!-- MINE -->
+  <section role="tabpanel" id="v-mine" aria-labelledby="t-mine">
+    <div class="hero">
+      <div>
+        <p class="eyebrow">Edge-case mining · Physical AI</p>
+        <h1>Find the moments <span class="ghost">your model</span> hasn't seen yet.</h1>
+        <p class="lede">Search 41 hours of dashcam, highway, street and warehouse footage in plain language. Every hit is scored for criticality and rarity, so the strangest near-misses rise to the top.</p>
+        <p style="margin-top:16px"><span class="sample">● Sample data from the indexed corpus</span></p>
+      </div>
+      <div class="stage">
+        <div class="searchcard">
+          <form class="searchrow" id="searchForm" role="search">
+            <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18 C 8 18, 9 6, 13 6 S 18 14, 21 14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+            <input id="q" type="text" placeholder="describe a scenario in natural language" autocomplete="off" aria-label="Scenario search">
+            <button class="btn soft" type="submit">Mine</button>
+          </form>
+          <ul class="suggest" id="suggest"></ul>
+        </div>
+        <div class="filters" id="filters" aria-label="Domain filter"></div>
+      </div>
+    </div>
+
+    <div class="section-head">
+      <div>
+        <p class="eyebrow" id="resultEyebrow">Ranked by criticality × rarity</p>
+        <h2 id="resultTitle">Top edge cases this week</h2>
+      </div>
+      <button class="btn line" id="similarReset" hidden>Clear "find similar"</button>
+    </div>
+    <div class="grid" id="results"></div>
+
+    <div class="inspector" id="inspector">
+      <div class="section-head" style="margin-top:0">
+        <div><p class="eyebrow">Inspector</p><h2 id="inspTitle">Select a clip</h2></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn line" id="inspSimilar">Find similar</button>
+          <button class="btn primary" id="inspAdd">Add to training set</button>
+        </div>
+      </div>
+      <div class="inspect-grid">
+        <canvas id="bigFrame" width="960" height="540" aria-label="Clip frame with detections"></canvas>
+        <div class="jsonpane">
+          <div class="titlebar"><span>scenario.json</span><span style="color:var(--muted)" id="inspSource"></span></div>
+          <pre id="json"></pre>
+        </div>
+      </div>
+      <div class="why">
+        <div><p class="eyebrow">Cosmos Reason saw</p><p id="cosmosText"></p></div>
+        <div><p class="eyebrow">Why it's an edge case</p><p id="whyText"></p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- COVERAGE -->
+  <section role="tabpanel" id="v-coverage" aria-labelledby="t-coverage" hidden>
+    <div style="padding-block:48px 24px">
+      <p class="eyebrow">Coverage</p>
+      <h1>Where your data <span class="ghost">runs thin.</span></h1>
+      <p class="lede">Scenario counts across operating conditions. Dashed cells have no examples, so that's footage to go collect or a scenario to synthesize.</p>
+    </div>
+    <div class="stage cov">
+      <table class="heat" id="heat"></table>
+      <div class="legend">
+        <span><i style="background:var(--mint)"></i>1–3 clips</span>
+        <span><i style="background:var(--mint-strong)"></i>4–9</span>
+        <span><i style="background:var(--signal)"></i>10+</span>
+        <span><i style="border:1px dashed var(--critical)"></i>gap</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- EXPORT -->
+  <section role="tabpanel" id="v-export" aria-labelledby="t-export" hidden>
+    <div style="padding-block:48px 24px">
+      <p class="eyebrow">Export</p>
+      <h1>Ship a curated set <span class="ghost">to your labeling queue.</span></h1>
+    </div>
+    <div class="export">
+      <div>
+        <h2 style="font-size:22px;margin-bottom:12px">In this set</h2>
+        <ul class="setlist" id="setList"></ul>
+        <h2 style="font-size:22px;margin:28px 0 4px">Live watch</h2>
+        <p class="lede" style="margin-top:0">New footage is screened as it's ingested. Matches go straight to review.</p>
+        <div class="livefeed" id="liveFeed"></div>
+      </div>
+      <div class="inspect-grid" style="background:var(--card);border:1px solid var(--line)">
+        <div class="jsonpane" style="grid-column:1/-1">
+          <div class="titlebar"><span>manifest.jsonl</span><button class="btn soft" id="copyManifest" style="padding:4px 10px">Copy</button></div>
+          <pre id="manifest"></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+// ---- sample scenarios (shaped like VSS search hits + LLM scenario tagging) ----
+const CLIPS = [
+  { id: "pie-s03-0412", title: "Pedestrian steps out from behind a parked van", domain: "driving", cam: "pie_cam-3", src: "set03/clip_0412", t: "06:52–06:57", sev: 3, crit: .94, rare: .88,
+    tags: ["pedestrian", "occlusion", "urban", "day"], scene: "road", light: "day",
+    boxes: [["person", .62, .45, .07, .3], ["van", .3, .38, .26, .34], ["car", .78, .48, .14, .16]],
+    cosmos: "A pedestrian emerges from behind a parked white van and steps into the lane roughly 8 m ahead of the ego vehicle, which brakes sharply.",
+    why: "Occluded pedestrian revealed within 1.2 s of the ego path. Only 3 similar clips exist in the corpus." },
+  { id: "i24-sc2-p1c3", title: "Truck cuts in with under one car-length gap", domain: "highway", cam: "i24_cam-1", src: "scene2_p1c3", t: "00:35–00:40", sev: 3, crit: .9, rare: .71,
+    tags: ["cut-in", "truck", "highway", "day"], scene: "highway", light: "day",
+    boxes: [["truck", .42, .35, .12, .26], ["car", .52, .52, .07, .12], ["car", .28, .62, .07, .12]],
+    cosmos: "A box truck merges from the right lane into the center lane directly in front of a sedan, leaving very little gap; the sedan brakes.",
+    why: "Aggressive cut-in from a heavy vehicle. Cut-ins are common, but this gap is in the bottom 5%." },
+  { id: "sdg-wh-0088", title: "Forklift and walker meet at a blind aisle corner", domain: "warehouse", cam: "sdg_warehouse_cam-2", src: "warehouse3/0088", t: "00:10–00:15", sev: 3, crit: .92, rare: .83,
+    tags: ["forklift", "pedestrian", "blind-corner", "indoor"], scene: "warehouse", light: "indoor",
+    boxes: [["forklift", .55, .4, .15, .3], ["person", .36, .42, .06, .28]],
+    cosmos: "A forklift turns out of an aisle at an intersection as a worker walks across; both stop within about a meter of each other.",
+    why: "Near-contact at a blind intersection. This is the main failure mode for mobile robots in warehouses." },
+  { id: "pie-s05-1730", title: "Cyclist swerves around a car door opening", domain: "driving", cam: "pie_cam-3", src: "set05/clip_1730", t: "14:21–14:26", sev: 2, crit: .78, rare: .91,
+    tags: ["cyclist", "dooring", "urban", "dusk"], scene: "road", light: "dusk",
+    boxes: [["bicycle", .5, .5, .06, .16], ["car", .3, .5, .2, .2], ["person", .41, .46, .04, .15]],
+    cosmos: "A parked car's door opens into the bike lane; a cyclist swerves left toward the traffic lane in front of the ego vehicle.",
+    why: "Dooring plus a cyclist entering the ego lane at dusk. This combination is very rare in the corpus." },
+  { id: "sf-c2-1104", title: "Jaywalker crosses against turning traffic", domain: "streets", cam: "sf_streets_cam-2", src: "sf-streets/2", t: "11:04–11:09", sev: 2, crit: .74, rare: .62,
+    tags: ["pedestrian", "jaywalk", "intersection", "day"], scene: "street", light: "day",
+    boxes: [["person", .48, .55, .04, .16], ["car", .6, .5, .14, .14], ["bus", .15, .4, .2, .22]],
+    cosmos: "A person crosses mid-block while a car turns right into the same lane; the car slows and the pedestrian hurries across.",
+    why: "Conflicting paths with a turning vehicle, seen from a fixed street camera." },
+  { id: "nb-d2-1912", title: "Car reverses out of a driveway into passing traffic", domain: "streets", cam: "neighborhood_cam-1", src: "2026-09-02", t: "19:12–19:17", sev: 2, crit: .69, rare: .77,
+    tags: ["reversing", "driveway", "residential", "night"], scene: "street", light: "night",
+    boxes: [["car", .32, .5, .16, .16], ["car", .62, .52, .14, .13]],
+    cosmos: "At night a car backs out of a driveway as another vehicle approaches on the street; the approaching car stops.",
+    why: "Reversing vehicles at night appear in under 1% of segments." },
+  { id: "i24-sc4-p2c1", title: "Stalled vehicle on the shoulder, traffic merges left", domain: "highway", cam: "i24_cam-1", src: "scene4_p2c1", t: "01:20–01:25", sev: 1, crit: .58, rare: .66,
+    tags: ["stalled", "shoulder", "highway", "day"], scene: "highway", light: "day",
+    boxes: [["car", .7, .3, .07, .12], ["truck", .45, .45, .1, .22], ["car", .35, .65, .07, .12]],
+    cosmos: "A car is stopped on the right shoulder; following traffic shifts left and slows.",
+    why: "A static hazard in the drivable area, useful for testing lane-change planning." },
+  { id: "sdg-wh-0131", title: "Pallet left in a pedestrian walkway", domain: "warehouse", cam: "sdg_warehouse_cam-2", src: "warehouse3/0131", t: "00:00–00:05", sev: 1, crit: .52, rare: .54,
+    tags: ["obstacle", "walkway", "indoor"], scene: "warehouse", light: "indoor",
+    boxes: [["pallet", .45, .58, .14, .12], ["person", .7, .4, .05, .24]],
+    cosmos: "A loaded pallet sits across a marked walkway; a worker steps around it.",
+    why: "An off-map static obstacle that forces a path deviation." },
+];
+const SUGGEST = [
+  "Pedestrian appears from behind a parked vehicle",
+  "Vehicle cuts in with a very small gap",
+  "Forklift and person at a blind corner",
+  "Cyclist enters the lane unexpectedly",
+  "Anything reversing at night",
+];
+const DOMAINS = ["all", "driving", "highway", "streets", "warehouse"];
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const state = { domain: "all", query: "", similarTo: null, selected: CLIPS[0].id, set: new Set(["pie-s03-0412", "sdg-wh-0088"]) };
+
+// ---- procedural frames: stand-ins for real clip thumbnails ----
+function drawFrame(canvas, clip, big = false) {
+  const c = canvas.getContext("2d"), W = canvas.width, H = canvas.height;
+  const dark = clip.light === "night", dusk = clip.light === "dusk";
+  if (clip.scene === "highway") {           // overhead highway
+    c.fillStyle = "#3a3f3c"; c.fillRect(0, 0, W, H);
+    c.fillStyle = "#5c6b5f"; c.fillRect(0, 0, W * .14, H); c.fillRect(W * .86, 0, W * .14, H);
+    c.strokeStyle = "rgba(255,255,255,.55)"; c.lineWidth = W / 300; c.setLineDash([H / 14, H / 14]);
+    [.32, .5, .68].forEach(x => { c.beginPath(); c.moveTo(W * x, 0); c.lineTo(W * x, H); c.stroke(); });
+    c.setLineDash([]);
+  } else if (clip.scene === "warehouse") {  // ceiling view of aisles
+    c.fillStyle = "#c9c4b8"; c.fillRect(0, 0, W, H);
+    c.fillStyle = "#6f7e8c"; [[0, .05, .25, .3], [0, .65, .25, .3], [.75, .05, .25, .3], [.75, .65, .25, .3]].forEach(([x, y, w, h]) => c.fillRect(W * x, H * y, W * w, H * h));
+    c.fillStyle = "#e8c547"; c.fillRect(0, H * .47, W, H * .015); c.fillRect(W * .49, 0, W * .01, H);
+  } else {                                  // forward-facing road / street
+    const sky = c.createLinearGradient(0, 0, 0, H * .5);
+    sky.addColorStop(0, dark ? "#0d1420" : dusk ? "#c98a6b" : "#a9c6dc"); sky.addColorStop(1, dark ? "#1d2633" : dusk ? "#e9c39a" : "#dfe9ee");
+    c.fillStyle = sky; c.fillRect(0, 0, W, H * .5);
+    c.fillStyle = dark ? "#151a17" : "#8c948c"; c.fillRect(0, H * .5, W, H * .5);
+    c.fillStyle = dark ? "#222" : "#5d635e";
+    c.beginPath(); c.moveTo(W * .44, H * .5); c.lineTo(W * .56, H * .5); c.lineTo(W * .95, H); c.lineTo(W * .05, H); c.fill();
+    c.strokeStyle = "rgba(255,255,255,.7)"; c.lineWidth = W / 220; c.setLineDash([H / 18, H / 22]);
+    c.beginPath(); c.moveTo(W * .5, H * .52); c.lineTo(W * .5, H); c.stroke(); c.setLineDash([]);
+    c.fillStyle = dark ? "#1b222b" : "#b7bcb6";
+    for (let i = 0; i < 6; i++) { const x = i * W / 6, h = H * (.12 + (i * 37 % 11) / 60); c.fillRect(x, H * .5 - h, W / 6 - 6, h); }
+  }
+  // detections
+  const signal = css("--signal") || "#19c37d";
+  clip.boxes.forEach(([label, x, y, w, h]) => {
+    c.strokeStyle = signal; c.lineWidth = big ? 3 : 2; c.strokeRect(W * x, H * y, W * w, H * h);
+    c.fillStyle = "rgba(25,195,125,.14)"; c.fillRect(W * x, H * y, W * w, H * h);
+    if (big) {
+      c.font = `${Math.round(W / 60)}px "Fragment Mono", monospace`;
+      const tag = `"${label}"`; const tw = c.measureText(tag).width + 12;
+      c.fillStyle = "rgba(0,0,0,.6)"; c.fillRect(W * x, H * y - W / 40, tw, W / 42);
+      c.fillStyle = "#fff"; c.fillText(tag, W * x + 6, H * y - W / 120);
+    }
+  });
+}
+
+// ---- search: keyword overlap stands in for the VSS hybrid vector search ----
+function score(clip) { return clip.crit * .55 + clip.rare * .45; }
+function matches(clip) {
+  if (state.domain !== "all" && clip.domain !== state.domain) return false;
+  if (!state.query) return true;
+  const words = state.query.toLowerCase().split(/\W+/).filter(w => w.length > 3);
+  const hay = (clip.title + " " + clip.tags.join(" ") + " " + clip.cosmos).toLowerCase();
+  return words.some(w => hay.includes(w.slice(0, 5)));
+}
+function similarity(a, b) { return a.tags.filter(t => b.tags.includes(t)).length + (a.domain === b.domain ? .5 : 0); }
+
+function renderResults() {
+  let list = CLIPS.filter(matches);
+  if (state.similarTo) {
+    const ref = CLIPS.find(c => c.id === state.similarTo);
+    list = CLIPS.filter(c => c.id !== ref.id).sort((a, b) => similarity(b, ref) - similarity(a, ref)).slice(0, 4);
+    $("#resultEyebrow").textContent = "Visual + caption similarity";
+    $("#resultTitle").textContent = `More like "${ref.title}"`;
+  } else {
+    list.sort((a, b) => score(b) - score(a));
+    $("#resultEyebrow").textContent = "Ranked by criticality × rarity";
+    $("#resultTitle").textContent = state.query ? `${list.length} scenarios for "${state.query}"` : "Top edge cases this week";
+  }
+  $("#similarReset").hidden = !state.similarTo;
+  const box = $("#results");
+  if (!list.length) { box.innerHTML = `<div class="empty">No scenarios match yet. Try a broader description, or re-ingest footage with a prompt that mentions it.</div>`; return; }
+  const sevName = ["", "low", "elevated", "critical"];
+  box.innerHTML = list.map(c => `
+    <article class="clip ${c.id === state.selected ? "selected" : ""}" data-id="${c.id}">
+      <canvas width="480" height="270" aria-hidden="true"></canvas>
+      <div class="body">
+        <div style="display:flex;justify-content:space-between;gap:8px"><span class="sev s${c.sev}">${sevName[c.sev]}</span><span class="meta">${esc(c.t)}</span></div>
+        <h3>${esc(c.title)}</h3>
+        <div class="meta"><span>${esc(c.cam)}</span><span>${esc(c.src)}</span></div>
+        <div class="tags">${c.tags.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</div>
+        <div class="scores">
+          <span>criticality</span><span class="bar"><i style="width:${c.crit * 100}%"></i></span><span>${c.crit.toFixed(2)}</span>
+          <span>rarity</span><span class="bar"><i style="width:${c.rare * 100}%;background:var(--signal)"></i></span><span>${c.rare.toFixed(2)}</span>
+        </div>
+        <div class="actions">
+          <button class="btn line" data-act="inspect">Inspect</button>
+          <button class="btn ${state.set.has(c.id) ? "soft" : "line"}" data-act="add">${state.set.has(c.id) ? "In set ✓" : "Add to set"}</button>
+        </div>
+      </div>
+    </article>`).join("");
+  box.querySelectorAll(".clip").forEach(el => drawFrame(el.querySelector("canvas"), CLIPS.find(c => c.id === el.dataset.id)));
+}
+
+function jsonLines(obj) {
+  const fmt = v => typeof v === "number" ? `<span class="n">${v}</span>` :
+    Array.isArray(v) ? "[" + v.map(x => `<span class="s">"${esc(x)}"</span>`).join(", ") + "]" : `<span class="s">"${esc(v)}"</span>`;
+  const keys = Object.keys(obj);
+  return [`<span class="l">{</span>`, ...keys.map((k, i) => `<span class="l">  <span class="k">"${k}"</span>: ${fmt(obj[k])}${i < keys.length - 1 ? "," : ""}</span>`), `<span class="l">}</span>`].join("");
+}
+
+function renderInspector() {
+  const c = CLIPS.find(x => x.id === state.selected);
+  $("#inspTitle").textContent = c.title;
+  $("#inspSource").textContent = c.cam;
+  drawFrame($("#bigFrame"), c, true);
+  $("#json").innerHTML = jsonLines({
+    scenario_id: c.id, actors: c.boxes.map(b => b[0]), maneuver: c.tags[1] || c.tags[0],
+    conditions: [c.light, c.tags.at(-1)], window: c.t, criticality: c.crit, rarity: c.rare,
+    source: `s3://vss-chunks-segments/${c.src}`,
+  });
+  $("#cosmosText").textContent = c.cosmos;
+  $("#whyText").textContent = c.why;
+  $("#inspAdd").textContent = state.set.has(c.id) ? "In training set ✓" : "Add to training set";
+}
+
+function renderSet() {
+  $("#setCount").textContent = state.set.size;
+  const items = CLIPS.filter(c => state.set.has(c.id));
+  $("#setList").innerHTML = items.length ? items.map(c => `<li><span>${esc(c.title)}</span><span class="sev s${c.sev}"></span></li>`).join("")
+    : `<li><span style="color:var(--muted)">Nothing yet. Add clips from Mine.</span></li>`;
+  $("#manifest").innerHTML = (items.length ? items : [{ id: "…" }]).map(c => c.cam ? `<span class="l">{<span class="k">"id"</span>: <span class="s">"${c.id}"</span>, <span class="k">"source"</span>: <span class="s">"${esc(c.cam)}/${esc(c.src)}"</span>, <span class="k">"window"</span>: <span class="s">"${c.t}"</span>, <span class="k">"tags"</span>: [${c.tags.map(t => `<span class="s">"${t}"</span>`).join(", ")}], <span class="k">"criticality"</span>: <span class="n">${c.crit}</span>}</span>` : `<span class="l">// add clips to build the manifest</span>`).join("");
+}
+
+function renderCoverage() {
+  const rows = ["Occluded pedestrian", "Cut-in", "Cyclist conflict", "Vehicle reversing", "Blind-corner meet", "Static obstacle"];
+  const cols = ["Day", "Dusk", "Night", "Rain", "Indoor"];
+  const data = [[7, 2, 0, 0, 0], [14, 3, 1, 0, 0], [4, 1, 0, 0, 0], [2, 0, 1, 0, 0], [0, 0, 0, 0, 11], [5, 1, 0, 0, 6]];
+  const fill = n => n >= 10 ? css("--signal") : n >= 4 ? css("--mint-strong") : css("--mint");
+  $("#heat").innerHTML = `<tr><th></th>${cols.map(c => `<th>${c}</th>`).join("")}</tr>` +
+    rows.map((r, i) => `<tr><th>${r}</th>${data[i].map(n => n ? `<td style="background:${fill(n)};color:${n >= 10 ? "#04140c" : "var(--ink)"}">${n}</td>` : `<td class="gap">gap</td>`).join("")}</tr>`).join("");
+}
+
+function renderLive() {
+  const feed = [["14:02", "pie_cam-3 set06", "Pedestrian steps out from behind a bus", "queued"],
+                ["13:47", "sf_streets_cam-4", "Scooter crosses against the light", "queued"],
+                ["13:31", "i24_cam-1 scene5", "Close cut-in by a pickup", "in review"]];
+  $("#liveFeed").innerHTML = feed.map(([t, cam, what, st]) => `<div><span class="pulse"></span><span>${t}</span><b>${esc(what)}</b><span>${esc(cam)} · ${st}</span></div>`).join("");
+}
+
+// ---- wiring ----
+$("#suggest").innerHTML = SUGGEST.map(s => `<li><button type="button"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span>${esc(s)}</span><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 17 7 7M7 15V7h8" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button></li>`).join("");
+$("#suggest").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; $("#q").value = b.textContent.trim(); runSearch(); });
+$("#filters").innerHTML = DOMAINS.map(d => `<button class="chip" aria-pressed="${d === "all"}" data-d="${d}">${d}</button>`).join("");
+$("#filters").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
+  state.domain = b.dataset.d; document.querySelectorAll("#filters .chip").forEach(x => x.setAttribute("aria-pressed", x === b)); state.similarTo = null; renderResults(); });
+function runSearch() { state.query = $("#q").value.trim(); state.similarTo = null; renderResults(); }
+$("#searchForm").addEventListener("submit", e => { e.preventDefault(); runSearch(); });
+
+$("#results").addEventListener("click", e => {
+  const card = e.target.closest(".clip"); if (!card) return;
+  const id = card.dataset.id, act = e.target.closest("button")?.dataset.act;
+  if (act === "add") { state.set.has(id) ? state.set.delete(id) : state.set.add(id); renderSet(); }
+  state.selected = id; renderResults(); renderInspector();
+  if (act === "inspect") $("#inspector").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+});
+$("#inspSimilar").onclick = () => { state.similarTo = state.selected; renderResults(); $("#results").scrollIntoView({ behavior: "smooth", block: "center" }); };
+$("#similarReset").onclick = () => { state.similarTo = null; renderResults(); };
+$("#inspAdd").onclick = () => { const id = state.selected; state.set.has(id) ? state.set.delete(id) : state.set.add(id); renderSet(); renderResults(); renderInspector(); };
+
+function showTab(name) {
+  document.querySelectorAll('[role="tab"]').forEach(t => t.setAttribute("aria-selected", t.id === "t-" + name));
+  document.querySelectorAll('[role="tabpanel"]').forEach(p => p.hidden = p.id !== "v-" + name);
+  if (name === "coverage") renderCoverage();
+}
+document.querySelectorAll('[role="tab"]').forEach(t => t.onclick = () => showTab(t.id.slice(2)));
+$("#exportBtn").onclick = () => showTab("export");
+$("#copyManifest").onclick = async e => {
+  const text = $("#manifest").innerText;
+  try { await navigator.clipboard.writeText(text); e.target.textContent = "Copied"; }
+  catch { const r = document.createRange(); r.selectNodeContents($("#manifest")); getSelection().removeAllRanges(); getSelection().addRange(r); e.target.textContent = "Selected"; }
+  setTimeout(() => e.target.textContent = "Copy", 1500);
+};
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { renderResults(); renderInspector(); renderCoverage(); });
+
+document.fonts.ready.then(() => renderInspector());
+renderResults(); renderInspector(); renderSet(); renderLive();
+</script>
