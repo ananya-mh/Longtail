@@ -1,5 +1,7 @@
 # Longtail
 
+Longtail is a video agent that lets self-driving and robotics teams describe a rare, dangerous scenario in plain English and get back Cosmos-verified clips, ranked by danger and rarity, plus a training-ready JSON with clip IDs and start/end times.
+
 ![Longtail preview](demo/longtail_preview.gif)
 
 **Full 2-minute narrated demo:**
