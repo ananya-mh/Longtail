@@ -58,6 +58,24 @@ def features(text):
     return {"categories": cats, "condition": cond, "near_miss": near, "keyword_criticality": round(crit, 2)}
 
 
+YOLO_SYNONYMS = {
+    "person": ["pedestrian", "person", "people", "worker", "walker", "child", "man", "woman"],
+    "car": ["car", "sedan", "suv", "vehicle"], "truck": ["truck", "lorry", "pickup"], "bus": ["bus"],
+    "bicycle": ["bicycle", "bike", "cyclist"], "motorcycle": ["motorcycle", "motorbike", "scooter"],
+    "stop sign": ["stop sign"], "traffic light": ["traffic light", "red light", "signal"],
+    "fire hydrant": ["fire hydrant", "hydrant"], "dog": ["dog"], "backpack": ["backpack"],
+    "umbrella": ["umbrella"], "train": ["train", "tram", "streetcar"],
+}
+
+
+def yolo_classes_in(text):
+    """COCO classes YOLO11 can detect that the request mentions (max 2, most specific first)."""
+    t = (text or "").lower()
+    hits = [cls for cls, words in YOLO_SYNONYMS.items() if any(re.search(rf"\b{re.escape(w)}s?\b", t) for w in words)]
+    hits.sort(key=lambda c: c in ("person", "car"))  # specific objects (stop sign, bicycle...) before generic ones
+    return hits[:2]
+
+
 def init_tracing():
     if weave and os.environ.get("WANDB_API_KEY"):
         entity = os.environ.get("WANDB_TEAM") or os.environ.get("WANDB_ENTITY")
@@ -297,7 +315,7 @@ class Miner:
 
     # ---- mining agent: prompt -> phrases -> search -> Cosmos verifies -> clips + manifest ----
     @op
-    def mine(self, prompt, condition=None, category=None, domain="all", n_check=12, n_extra=12):
+    def mine(self, prompt, condition=None, category=None, domain="all", n_check=12, n_extra=36):
         steps = []
         ask = (f"A training-data engineer wants video clips of this edge case: '{prompt}'. The footage is dashcam, "
                "highway, city street and warehouse CCTV, each 5-second clip described by a video model in plain "
@@ -315,24 +333,52 @@ class Miner:
         phrases = [prompt] + [p for p in phrases if p.lower() != prompt.lower()]
         steps.append({"step": "Expanded the request into search phrases", "detail": phrases})
 
-        found = {}
+        found, sources = {}, {"search": 0, "embedding": 0, "objects": 0}
+
+        def add(rows, via):
+            for r in rows:
+                if r and r["source"] not in found and domain in ("all", r["domain"]):
+                    found[r["source"]] = r
+                    sources[via] += 1
+
+        # 1) backend hybrid search, 40 hits per phrase
         for p in phrases:
             try:
-                for h in self.vss.search(p, top_k=15).get("results", []):
-                    r = self.row(h.get("source"))
-                    if r and r["source"] not in found and domain in ("all", r["domain"]):
-                        found[r["source"]] = r
+                add([self.row(h.get("source")) for h in self.vss.search(p, top_k=40).get("results", [])], "search")
             except Exception as e:
                 print(f"[mine] search '{p}' failed: {e}")
+        # 2) our own Cosmos-Embed1 index over every segment caption
+        qvecs = None
+        try:
+            qvecs = gpu.embed_texts(phrases)
+            with self.lock:
+                sims = (self.vecs @ qvecs.T).max(axis=1)
+            add([self.rows[i] for i in np.argsort(-sims)[:30 * len(phrases)]], "embedding")
+        except Exception as e:
+            print(f"[mine] embedding search failed: {e}")
+        # 3) YOLO object filter when the prompt names a detectable object
+        for cls in yolo_classes_in(" ".join(phrases)):
+            try:
+                res = self.vss.search(prompt, top_k=40, metadata_filters={"object_classes": cls})
+                add([self.row(h.get("source")) for h in res.get("results", [])], "objects")
+            except Exception as e:
+                print(f"[mine] object filter '{cls}' failed: {e}")
+
         pool = list(found.values())
         in_cond = [r for r in pool if condition and r["condition"] == condition]
         pool = in_cond or pool
-        pool.sort(key=lambda r: ((category in r["categories"]) if category else False,
-                                 r["keyword_criticality"] + r.get("rarity", 0)), reverse=True)
+        # send Cosmos the clips that best match the request (not the most dangerous ones)
+        if qvecs is not None:
+            rel = {r["source"]: float((self.vecs[self.index[r["source"]]] @ qvecs.T).max()) for r in pool}
+        else:
+            rel = {r["source"]: 0.0 for r in pool}
+        pool.sort(key=lambda r: ((category in r["categories"]) if category else False, rel[r["source"]]), reverse=True)
         cands = pool[:n_check]
         steps.append({"step": "Searched the index",
-                      "detail": f"{len(found)} candidate clips" + (f", {len(in_cond)} in {condition.lower()} conditions" if condition else "")
-                                + f"; sending the best {len(cands)} to Cosmos"})
+                      "detail": f"{len(found)} candidate clips ({sources['search']} hybrid search, {sources['embedding']} "
+                                f"Cosmos-Embed, {sources['objects']} YOLO object filter)"
+                                + (f", {len(in_cond)} in {condition.lower()} conditions" if condition else "")
+                                + f"; sending the {len(cands)} closest matches to Cosmos"})
 
         with ThreadPoolExecutor(max_workers=12) as ex:
             analyses = list(ex.map(lambda r: self._verify(r, prompt), cands))
@@ -349,8 +395,7 @@ class Miner:
                 kept.append({**self.card(r), "verified": True})
         kept.sort(key=lambda c: c["score"], reverse=True)
         steps.append({"step": "Cosmos3-Reason watched each clip", "detail": f"{len(kept)} of {len(checked)} match the request"})
-        extra = [{**self.card(r), "verified": False} for r in pool[n_check:n_check + n_extra]]
-        extra.sort(key=lambda c: c["score"], reverse=True)
+        extra = [{**self.card(r), "verified": False} for r in pool[n_check:n_check + n_extra]]  # already in relevance order
         if extra:
             steps.append({"step": "More search matches", "detail": f"{len(extra)} more clips, not yet verified by Cosmos"})
         results = kept + extra
