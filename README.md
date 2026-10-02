@@ -8,13 +8,26 @@ Longtail is a video agent that lets self-driving and robotics teams describe a r
 
 https://github.com/user-attachments/assets/44209625-b7a6-438d-94fa-66771338f1ea
 
-**Self-driving and robotics models fail on the rare moments they've never seen. Longtail finds those moments in footage nobody has watched.**
+## Project description
 
-Describe a corner case in plain English ("a pedestrian steps out from behind a parked van"). Longtail's agent searches every indexed camera, has NVIDIA Cosmos watch the best candidates to verify them, ranks what's left by **danger × rarity**, and hands back playable clips plus a training-ready JSON manifest with clip IDs and start/end times.
+Self-driving cars and warehouse robots rarely fail on everyday scenes. They fail on rare moments like a pedestrian stepping out from behind a van or a worker beside a moving forklift, and those moments are buried in hours of unwatched video. Longtail is a video agent that finds them. You describe a corner case in plain English, and the agent:
+
+1. expands it into several searches
+2. searches the indexed footage three ways: VAST's hybrid search, our own Cosmos-Embed index, and YOLO object detections
+3. has NVIDIA Cosmos3-Reason watch the best candidates and keep only real matches
+
+Results are ranked by danger (Cosmos's rating) and rarity (embedding distance within each camera pack). Each clip comes with a structured scenario label, "find similar" turns one example into a set, and a coverage map shows which situations are missing and lets the agent fill those gaps. Every run exports a training-ready JSON with clip IDs and start/end times, or a versioned Weights & Biases dataset. It works across real dashcam, highway and street cameras and synthetic warehouse footage.
+
+**Tools used:**
+- **VAST AI OS:** S3, DataEngine re-ingest with our edge-case prompt, VastDB hybrid search, and the VSS APIs
+- **NVIDIA:** Cosmos3-Reason (verification and labels), Cosmos-Embed1 (rarity and similarity), YOLO11 (object filter), and Nemotron (agent LLM)
+- **CoreWeave:** GPUs serving the models, and Kubernetes hosting the app
+- **Weights & Biases:** Serverless Inference, Weave tracing, and Weave Dataset export
+- **Cursor:** built on the workshop VM
 
 Built for the VAST Builders Challenge (San Francisco, Oct 2 2026) on team-21's pre-indexed corpus: Toronto dashcam drives, I-24 highway cameras, SF and neighborhood street cameras, and a synthetic NVIDIA warehouse. That's 2,352 five-second segments from 414 videos.
 
-- **Live app:** http://video-lab-team-21.cosmos.vastdata.com/app/ (reachable from inside the workshop network; see the demo video otherwise)
+- **Live app:** https://team-21-app.thecosmoslabs.com/app/
 - **Demo video:** [demo/Longtail_explainer.mp4](demo/Longtail_explainer.mp4) (2 min, 1080p) · [play / download](https://github.com/ananya-mh/Longtail/raw/main/demo/Longtail_explainer.mp4)
 
 ## What it does
