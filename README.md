@@ -7,7 +7,7 @@ Describe a corner case in plain English ("a pedestrian steps out from behind a p
 Built for the VAST Builders Challenge (San Francisco, Oct 2 2026) on team-21's pre-indexed corpus: Toronto dashcam drives, I-24 highway cameras, SF and neighborhood street cameras, and a synthetic NVIDIA warehouse. That's 2,352 five-second segments from 414 videos.
 
 - **Live app:** http://video-lab-team-21.cosmos.vastdata.com/app/ (reachable from inside the workshop network; see the demo video otherwise)
-- **Demo video:** _link_
+- **Demo video:** [demo/Longtail_explainer.mp4](demo/Longtail_explainer.mp4) (2 min, 1080p) · [play / download](https://github.com/ananya-mh/Longtail/raw/main/demo/Longtail_explainer.mp4)
 
 ## What it does
 
